@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import brandLogo from "@/assets/logo.png";
+import { authApi } from "@/lib/api";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -21,19 +22,7 @@ function LoginPage() {
     console.log("[Login] Attempting login for:", phone);
     
     try {
-      const res = await fetch("http://localhost:3011/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        console.error("[Login] Failed:", data);
-        throw new Error(data.error || data.message || "Invalid credentials or account not found.");
-      }
-
-      const user = await res.json();
+      const user = await authApi.login({ phone, password });
       console.log("[Login] Success, user data:", user);
       
       if (user.status === "pending") {

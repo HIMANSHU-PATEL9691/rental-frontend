@@ -67,6 +67,16 @@ export interface Rental {
   updatedAt: string;
 }
 
+export interface User {
+  _id: string;
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  role: 'admin' | 'employee';
+  status?: 'active' | 'pending';
+}
+
 async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
   const method = options?.method || 'GET';
   const role = typeof window !== 'undefined' ? localStorage.getItem('user_role')?.trim().toLowerCase() || undefined : undefined;
@@ -211,4 +221,31 @@ export const rentalsApi = {
     });
   },
   delete: (id: string) => apiRequest<{ message: string }>(`${API_BASE}/rentals/${id}`, { method: 'DELETE' }),
+};
+
+// Auth API
+export const authApi = {
+  login: (data: { phone: string; password: string }) =>
+    apiRequest<User>(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  signup: (data: { name: string; phone: string; password: string; role: 'employee'; status: 'pending' }) =>
+    apiRequest<User>(`${API_BASE}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  getUsers: () => apiRequest<User[]>(`${API_BASE}/auth/users`),
+  updateUserStatus: (identifier: string, status: 'active' | 'pending') =>
+    apiRequest<{ message: string; user: User }>(`${API_BASE}/auth/users/${encodeURIComponent(identifier)}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }),
+  deleteUser: (identifier: string) =>
+    apiRequest<{ message: string }>(`${API_BASE}/auth/users/${encodeURIComponent(identifier)}`, {
+      method: 'DELETE',
+    }),
 };

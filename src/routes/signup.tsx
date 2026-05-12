@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import brandLogo from "@/assets/logo.png";
+import { authApi } from "@/lib/api";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -22,18 +23,7 @@ function SignupPage() {
     console.log("[Signup] Attempting signup for:", { name, phone });
     
     try {
-      const res = await fetch("http://localhost:3011/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, password, role: "employee", status: "pending" }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        console.error("[Signup] Failed:", data);
-        throw new Error(data.error || data.message || "An error occurred during signup.");
-      }
-      
+      await authApi.signup({ name, phone, password, role: "employee", status: "pending" });
       console.log("[Signup] Success!");
       
       toast.success("Signup successful! Your account is pending admin approval.");

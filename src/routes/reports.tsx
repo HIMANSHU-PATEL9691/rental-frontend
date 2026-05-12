@@ -17,6 +17,7 @@ import { FileText, Filter, UserCheck, UserX, Trash2, Calendar } from "lucide-rea
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { authApi, type User } from "@/lib/api";
 
 function formatDate(dateStr: string) {
   if (!dateStr) return "";
@@ -55,10 +56,10 @@ function ReportsPage() {
   const [reportType, setReportType] = useState<"daily" | "monthly" | "items" | "staff">("daily");
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [staffList, setStaffList] = useState<any[]>([]);
+  const [staffList, setStaffList] = useState<User[]>([]);
 
-  const pendingStaff = staffList.filter((s: any) => s.status === 'pending' || !s.status);
-  const approvedStaff = staffList.filter((s: any) => s.status !== 'pending' && s.status);
+  const pendingStaff = staffList.filter((s) => s.status === 'pending' || !s.status);
+  const approvedStaff = staffList.filter((s) => s.status !== 'pending' && s.status);
 
   const filteredRentals = useMemo(() => {
     if (reportType === "daily") {
@@ -99,22 +100,13 @@ function ReportsPage() {
   const loadUsers = async () => {
     try {
       console.log("[Staff Report] Fetching users...");
-      const res = await fetch("http://localhost:3011/api/auth/users", { headers: { 'x-user-role': localStorage.getItem('user_role') || '' } });
-      if (res.ok) {
-        const data = await res.json();
-        console.log("[Staff Report] Users fetched:", data);
-        const userArray = Array.isArray(data) ? data : data.users || [];
-        // Map MongoDB _id to id for compatibility
-        const formattedData = userArray.map((u: any) => ({ ...u, id: u.id || u._id }));
-        setStaffList(formattedData.filter((u: any) => u.role !== "admin"));
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        console.error("[Staff Report] Failed to fetch users:", errData);
-        toast.error(errData.error || "Failed to load staff list from backend. (Check backend routes)");
-      }
+      const data = await authApi.getUsers();
+      console.log("[Staff Report] Users fetched:", data);
+      const formattedData = data.map((u) => ({ ...u, id: u.id || u._id }));
+      setStaffList(formattedData.filter((u) => u.role !== "admin"));
     } catch (err) {
       console.error("Failed to load users", err);
-      toast.error("Could not connect to backend to load staff.");
+      toast.error(err instanceof Error ? err.message : "Could not connect to backend to load staff.");
     }
   };
 
@@ -127,44 +119,26 @@ function ReportsPage() {
   const updateUserStatus = async (identifier: string, status: string, message: string) => {
     try {
       console.log(`[Staff Report] Updating user status: ${identifier} -> ${status}`);
-      const res = await fetch(`http://localhost:3011/api/auth/users/${identifier}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
-        console.log(`[Staff Report] User status updated successfully.`);
-        toast.success(message);
-        loadUsers();
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        console.error(`[Staff Report] Failed to update user status:`, errData);
-        toast.error(errData.error || "Failed to update status on server.");
-      }
+      await authApi.updateUserStatus(identifier, status as "active" | "pending");
+      console.log(`[Staff Report] User status updated successfully.`);
+      toast.success(message);
+      loadUsers();
     } catch (err) {
       console.error(`[Staff Report] Error updating user status:`, err);
-      toast.error("Error connecting to server.");
+      toast.error(err instanceof Error ? err.message : "Error connecting to server.");
     }
   };
 
   const removeUser = async (identifier: string, message: string) => {
     try {
       console.log(`[Staff Report] Removing user: ${identifier}`);
-      const res = await fetch(`http://localhost:3011/api/auth/users/${identifier}`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        console.log(`[Staff Report] User removed successfully.`);
-        toast.success(message);
-        loadUsers();
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        console.error(`[Staff Report] Failed to remove user:`, errData);
-        toast.error(errData.error || "Failed to delete user on server.");
-      }
+      await authApi.deleteUser(identifier);
+      console.log(`[Staff Report] User removed successfully.`);
+      toast.success(message);
+      loadUsers();
     } catch (err) {
       console.error(`[Staff Report] Error removing user:`, err);
-      toast.error("Error connecting to server.");
+      toast.error(err instanceof Error ? err.message : "Error connecting to server.");
     }
   };
 
