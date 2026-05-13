@@ -176,7 +176,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-72 border-sidebar-border bg-sidebar p-0">
+        <SheetContent side="left" className="w-[16rem] sm:w-72 border-sidebar-border bg-sidebar p-0">
+
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="px-6 py-7">
             <Brand />
@@ -186,8 +187,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SheetContent>
       </Sheet>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
         <header className="sticky top-0 z-10 min-h-14 border-b border-border bg-background/55 backdrop-blur-xl sm:min-h-16">
+
           <div className="flex h-14 items-center gap-2 px-4 sm:h-16 sm:gap-4 sm:px-6 lg:px-10">
             <Button
               variant="ghost"

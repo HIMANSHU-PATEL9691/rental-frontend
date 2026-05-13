@@ -158,29 +158,34 @@ export function NewRentalDialog({
   }
 
   async function ensureBillNo() {
-    if (form.billNo?.trim()) return;
+    if (form.billNo?.trim()) return form.billNo;
     setBillNoLoading(true);
 
-    // Generate automatically according to backend bill number sequence
-    // (Frontend-only numbering breaks when there are deletions/imports)
-    try {
-      const res = await import("@/lib/api");
-      const next = await (await res.billsApi.getNextBillNo());
-      setForm((c) => ({ ...c, billNo: next.billNo || "" }));
-    } catch {
-      // Fallback (should rarely happen)
-      const nextSeq = (rentals?.length || 0) + 1;
-      setForm((c) => ({ ...c, billNo: `BILL-${String(nextSeq).padStart(4, "0")}` }));
-    }
-    setBillNoLoading(false);
-  }
+    // Find gaps and reuse the lowest available deleted bill number
+    const existingNos = rentals
+      .map((r) => r.billNo)
+      .filter(Boolean)
+      .map((b) => {
+        const match = String(b).match(/BILL-(\d+)/i);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter((n) => n > 0);
 
-  useEffect(() => {
-    if (isOpen && !form.billNo) {
-      ensureBillNo();
+    const sorted = Array.from(new Set(existingNos)).sort((a, b) => a - b);
+    let nextSeq = 1;
+    for (const num of sorted) {
+      if (num === nextSeq) {
+        nextSeq++;
+      } else if (num > nextSeq) {
+        break;
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+    const generated = `BILL-${String(nextSeq).padStart(4, "0")}`;
+
+    setForm((c) => ({ ...c, billNo: generated }));
+    setBillNoLoading(false);
+    return generated;
+  }
 
   function getInvoiceContent() {
 
@@ -399,8 +404,8 @@ export function NewRentalDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     // Ensure billNo is filled automatically before validation/submission.
-    await ensureBillNo();
-    const parsed = schema.safeParse(form);
+    const finalBillNo = await ensureBillNo();
+    const parsed = schema.safeParse({ ...form, billNo: finalBillNo });
 
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
@@ -454,7 +459,7 @@ export function NewRentalDialog({
         const ratio = piecesTotal > 0 ? p.lineTotal / piecesTotal : 1 / piecesData.length;
 
         const payload: any = {
-          billNo: parsed.data.billNo || form.billNo,
+          billNo: parsed.data.billNo,
           address: parsed.data.address,
           customerId: parsed.data.customerId,
           discount: Math.round(parsed.data.discount * ratio),
@@ -533,7 +538,7 @@ export function NewRentalDialog({
                 id="billNo"
                 value={form.billNo}
                 onChange={(e) => setForm({ ...form, billNo: e.target.value })}
-                placeholder={billNoLoading ? "Generating..." : "Enter bill number"}
+                placeholder={billNoLoading ? "Generating..." : "Auto-generated on submit"}
                 maxLength={40}
               />
             </div>
@@ -553,7 +558,7 @@ export function NewRentalDialog({
                 value={form.customerId}
                 onValueChange={(v) => setForm({ ...form, customerId: v })}
               >
-                <SelectTrigger id="client">
+                <SelectTrigger id="client" className="[&>span]:truncate">
                   <SelectValue placeholder="Choose a client..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -566,7 +571,7 @@ export function NewRentalDialog({
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="grid gap-2">
                 <Label htmlFor="address">Customer Address</Label>
                 <Input
@@ -623,8 +628,8 @@ export function NewRentalDialog({
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="grid gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div className="grid gap-2 min-w-0">
                       <div className="flex items-center justify-between">
                         <Label>Piece {index + 1}</Label>
                         {index === 0 && (
@@ -648,7 +653,7 @@ export function NewRentalDialog({
                           });
                         }}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="[&>span]:truncate">
                           <SelectValue placeholder="Choose a piece..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -660,9 +665,29 @@ export function NewRentalDialog({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="grid gap-2">
+                    <div className="grid gap-2 min-w-0">
                       <Label>Item No</Label>
-                      <Input value={piece.itemNo} disabled />
+                      <Input
+                        value={piece.itemNo}
+                        onChange={e => {
+                          const itemNo = e.target.value;
+                          setForm(f => {
+                            const newPieces = [...f.pieces];
+                            newPieces[index] = { ...newPieces[index], itemNo };
+                            // Try to auto-fill if item exists
+                            const found = items.find(i => i.customId === itemNo);
+                            if (found) {
+                              newPieces[index] = {
+                                ...newPieces[index],
+                                itemId: found.id,
+                                rate: found.pricePerDay ?? 0,
+                              };
+                            }
+                            return { ...f, pieces: newPieces };
+                          });
+                        }}
+                        placeholder="Enter Item No"
+                      />
                     </div>
                   </div>
                   
@@ -771,7 +796,7 @@ export function NewRentalDialog({
               </Button>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="grid gap-2">
                 <Label htmlFor="discount">Discount</Label>
                 <Input
@@ -881,7 +906,7 @@ export function NewRentalDialog({
               ) : null}
             </div>
 
-            <div className="rounded-md border border-border bg-secondary/40 px-4 py-3 flex items-center justify-between">
+            <div className="rounded-md border border-border bg-secondary/40 px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
                   Total for {form.pieces.length} piece{form.pieces.length === 1 ? "" : "s"}

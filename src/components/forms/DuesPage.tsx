@@ -84,8 +84,9 @@ export function DuesPage() {
       </div>
 
       <div className="rounded-md border border-border bg-card overflow-hidden">
-        <div className="w-full overflow-auto">
-          <table className="w-full caption-bottom text-sm">
+        <div className="w-full overflow-x-auto">
+<table className="w-full min-w-200 caption-bottom text-sm">
+
             <thead className="[&_tr]:border-b bg-secondary/40">
               <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Bill No</th>

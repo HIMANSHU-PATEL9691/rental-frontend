@@ -84,6 +84,7 @@ function transformRental(rental: any): Rental {
     id: rental.customId,
     itemId,
     customerId,
+    rate: Number(rental.rate) || Number(rental.total) + Number(rental.discount || 0) || 0,
     startDate: formatDateOnly(rental.startDate),
     endDate: formatDateOnly(rental.endDate),
   };

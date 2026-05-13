@@ -41,6 +41,8 @@ const SUBCATEGORY_BY_CATEGORY = {
     "Lehanga", 
     "Sider jewellery", 
     "Bridal jewellery",
+    "Gown",
+    "Rajputana Dress",
     "Accessories"
   ]
 };
@@ -112,29 +114,80 @@ export function AddPieceDialog({
 
   const [loading, setLoading] = useState(false);
 
-  function handleImagesUpload(files: FileList | null) {
-    if (!files) return;
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith("image/")) {
-        toast.error(`File ${file.name} is not an image`);
-        return;
-      }
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error(`Image ${file.name} must be smaller than 2 MB`);
-        return;
-      }
-
+  async function compressImage(
+    file: File,
+    maxWidth = 800,
+    maxHeight = 800,
+    quality = 0.7
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
       const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === "string") {
-          setForm((current) => ({ ...current, images: [...current.images, reader.result as string] }));
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth || height > maxHeight) {
+            if (width / height > maxWidth / maxHeight) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('Canvas context is null'));
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) return reject(new Error('Compression failed'));
+              const reader2 = new FileReader();
+              reader2.onloadend = () => {
+                if (typeof reader2.result === 'string') {
+                  resolve(reader2.result);
+                } else {
+                  reject(new Error('Result is not a string'));
+                }
+              };
+              reader2.onerror = reject;
+              reader2.readAsDataURL(blob);
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        img.onerror = reject;
+        if (e && e.target && typeof e.target.result === 'string') {
+          img.src = e.target.result;
+        } else {
+          reject(new Error('FileReader result is not a string'));
         }
       };
-      reader.onerror = () => {
-        toast.error(`Could not read image file ${file.name}`);
-      };
+      reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  async function handleImagesUpload(files: FileList | null) {
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("image/")) {
+        toast.error(`File ${file.name} is not an image`);
+        continue;
+      }
+      try {
+        const compressed = await compressImage(file);
+        if (typeof compressed === 'string') {
+          setForm((current) => ({ ...current, images: [...current.images, compressed] }));
+        }
+      } catch (err) {
+        toast.error(`Could not process image file ${file.name}`);
+      }
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -171,166 +224,181 @@ export function AddPieceDialog({
   return (
     <Dialog open={isOpen} onOpenChange={setOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-full sm:max-w-lg max-h-[90vh] overflow-y-auto px-2 sm:px-0">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">Add a Piece</DialogTitle>
           <DialogDescription>Catalog a new item in the vault.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="customId">Item No</Label>
-              <Input
-                id="customId"
-                value={form.customId}
-                onChange={(e) => setForm({ ...form, customId: e.target.value })}
-                placeholder="e.g. VV-1234"
-                maxLength={40}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Onyx Tuxedo Coat"
-                maxLength={80}
-                required
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="designer">Designer</Label>
-              <Input
-                id="designer"
-                value={form.designer}
-                onChange={(e) => setForm({ ...form, designer: e.target.value })}
-                placeholder="Maison Noir"
-                maxLength={60}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={form.category}
-                onValueChange={(v) => {
-                  const firstSubcategory = SUBCATEGORY_BY_CATEGORY[v as keyof typeof SUBCATEGORY_BY_CATEGORY][0];
-                  setForm({ ...form, category: v, subcategory: firstSubcategory });
-                }}
-              >
-                <SelectTrigger id="category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(CATEGORIES).map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <form onSubmit={handleSubmit} className="space-y-6 mt-2">
+          {/* Identity Section */}
+          <div className="space-y-4 rounded-lg border border-border bg-secondary/10 p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border pb-2">Item Identity</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="customId">Item No</Label>
+                <Input
+                  id="customId"
+                  value={form.customId}
+                  onChange={(e) => setForm({ ...form, customId: e.target.value })}
+                  placeholder="e.g. VV-1234"
+                  maxLength={40}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Onyx Tuxedo Coat"
+                  maxLength={80}
+                  required
+                />
+              </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="designer">Designer</Label>
+                <Input
+                  id="designer"
+                  value={form.designer}
+                  onChange={(e) => setForm({ ...form, designer: e.target.value })}
+                  placeholder="Maison Noir"
+                  maxLength={60}
+                  required
+                />
+              </div>
             </div>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="subcategory">Subcategory</Label>
-            <Select
-              value={form.subcategory}
-              onValueChange={(v) => setForm({ ...form, subcategory: v })}
-            >
-              <SelectTrigger id="subcategory">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SUBCATEGORY_BY_CATEGORY[form.category as keyof typeof SUBCATEGORY_BY_CATEGORY]?.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="size">Size</Label>
-              <Select
-                value={form.size}
-                onValueChange={(v) => setForm({ ...form, size: v })}
-              >
-                <SelectTrigger id="size">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["XS", "S", "M", "L", "XL"].map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+          {/* Classification Section */}
+          <div className="space-y-4 rounded-lg border border-border bg-secondary/10 p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border pb-2">Classification</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="category">Category</Label>
+                <Select
+                  value={form.category}
+                  onValueChange={(v) => {
+                    const firstSubcategory = SUBCATEGORY_BY_CATEGORY[v as keyof typeof SUBCATEGORY_BY_CATEGORY][0];
+                    setForm({ ...form, category: v, subcategory: firstSubcategory });
+                  }}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(CATEGORIES).map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="subcategory">Subcategory</Label>
+                <Select
+                  value={form.subcategory}
+                  onValueChange={(v) => setForm({ ...form, subcategory: v })}
+                >
+                  <SelectTrigger id="subcategory">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUBCATEGORY_BY_CATEGORY[form.category as keyof typeof SUBCATEGORY_BY_CATEGORY]?.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="size">Size</Label>
+                <Select
+                  value={form.size}
+                  onValueChange={(v) => setForm({ ...form, size: v })}
+                >
+                  <SelectTrigger id="size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["XS", "S", "M", "L", "XL"].map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="color">Color</Label>
+                <Input
+                  id="color"
+                  value={form.color}
+                  onChange={(e) => setForm({ ...form, color: e.target.value })}
+                  placeholder="Emerald"
+                  maxLength={30}
+                  required
+                />
+              </div>
             </div>
-            <div className="grid gap-2 col-span-2">
-              <Label htmlFor="color">Color</Label>
-              <Input
-                id="color"
-                value={form.color}
-                onChange={(e) => setForm({ ...form, color: e.target.value })}
-                placeholder="Emerald"
-                maxLength={30}
-                required
-              />
+          </div>
+
+          {/* Pricing & Status Section */}
+          <div className="space-y-4 rounded-lg border border-border bg-secondary/10 p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border pb-2">Pricing & Status</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="price">Rental value (INR)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  min={0}
+                  value={form.pricePerDay}
+                  onChange={(e) =>
+                    setForm({ ...form, pricePerDay: e.target.value })
+                  }
+                  placeholder={formatCurrencyINR(95)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={form.status}
+                  onValueChange={(v: ItemStatus) =>
+                    setForm({ ...form, status: v })
+                  }
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["available", "rented", "cleaning", "reserved"] as const).map(
+                      (s) => (
+                        <SelectItem key={s} value={s}>
+                          {s[0].toUpperCase() + s.slice(1)}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="price">Rental value (INR)</Label>
-            <Input
-              id="price"
-              type="number"
-              min={0}
-              value={form.pricePerDay}
-              onChange={(e) =>
-                setForm({ ...form, pricePerDay: e.target.value })
-              }
-              placeholder={formatCurrencyINR(95)}
-              required
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="status">Status</Label>
-            <Select
-              value={form.status}
-              onValueChange={(v: ItemStatus) =>
-                setForm({ ...form, status: v })
-              }
-            >
-              <SelectTrigger id="status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(["available", "rented", "cleaning", "reserved"] as const).map(
-                  (s) => (
-                    <SelectItem key={s} value={s}>
-                      {s[0].toUpperCase() + s.slice(1)}
-                    </SelectItem>
-                  ),
-                )}
-              </SelectContent>
-            </Select>
-          </div>
+
           <div className="grid gap-2">
             <Label htmlFor="image">Upload Image</Label>
             <div className="grid gap-3 rounded-md border border-border bg-secondary/30 p-4">
               {form.images && form.images.length > 0 ? (
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2 sm:gap-3">
                   {form.images.map((img, idx) => (
                     <div key={idx} className="relative group shrink-0">
                       <img
                         src={img}
                         alt={`Preview ${idx + 1}`}
-                        className="h-20 w-16 rounded-sm border border-border object-cover shadow-sm"
+                        className="h-20 w-16 sm:h-20 sm:w-16 rounded-sm border border-border object-cover shadow-sm"
                       />
                       <button
                         type="button"

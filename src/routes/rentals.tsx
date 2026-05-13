@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Edit2, Plus, Trash2 } from "lucide-react";
+import { Edit2, Plus, Trash2, Search } from "lucide-react";
 import { EditRentalDialog } from "@/components/forms/EditRentalDialog";
 import { NewRentalDialog } from "@/components/forms/NewRentalDialog";
 import { toast } from "sonner";
@@ -67,13 +68,16 @@ function RentalsPage() {
   const { rentals, getItem, getCustomer, loading, deleteRental, searchQuery } = useStore();
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const query = searchQuery.trim().toLowerCase();
+  const [localSearch, setLocalSearch] = useState("");
+  const query = (localSearch || searchQuery || "").trim().toLowerCase();
+
   const filteredRentals = rentals.filter((r) => {
     const item = getItem(r.itemId);
     const customer = getCustomer(r.customerId);
     const searchable = [
       r.id,
       r.billNo,
+      r.itemNo,
       r.status,
       r.startDate,
       r.endDate,
@@ -106,16 +110,16 @@ function RentalsPage() {
     returned: filteredRentals.filter((r) => r.status === "returned").length,
   };
 
-  async function handleDelete(id: string) {
+  async function handleDelete(id: string, billNo?: string) {
     console.info("[RentalsPage] delete requested", { id });
     setDeletingId(id);
     try {
       await deleteRental(id);
-      toast.success(`Rental ${id} deleted`);
+      toast.success(`Order ${billNo || id} deleted`);
       console.info("[RentalsPage] delete success", { id });
     } catch (error) {
       console.error("[RentalsPage] delete failed", { id, error });
-      toast.error(`Failed to delete rental ${id}`);
+      toast.error(`Failed to delete order ${billNo || id}`);
     } finally {
       setDeletingId(null);
     }
@@ -138,13 +142,24 @@ function RentalsPage() {
           <p className="text-[10px] uppercase tracking-[0.4em] text-gold">Ledger</p>
           <h1 className="mt-2 font-display text-3xl sm:text-4xl">Rentals</h1>
         </div>
-        <NewRentalDialog
-          trigger={
-            <Button className="bg-gold text-gold-foreground hover:bg-gold/90 self-start sm:self-auto">
-              <Plus className="h-4 w-4 mr-1.5" /> New Rental
-            </Button>
-          }
-        />
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search bill no, item no..." 
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              className="pl-9 w-full bg-card border-border"
+            />
+          </div>
+          <NewRentalDialog
+            trigger={
+              <Button className="bg-gold text-gold-foreground hover:bg-gold/90 self-start sm:self-auto w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-1.5" /> New Rental
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
@@ -201,7 +216,7 @@ function RentalsPage() {
                   <div className="mt-2.5 flex items-end justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                        {r.id} - {customer?.name ?? `Missing client (${r.customerId || "unknown"})`}
+                        {r.billNo || r.id} - {customer?.name ?? `Missing client (${r.customerId || "unknown"})`}
                       </p>
                       <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
                       {formatDate(r.startDate)} to {formatDate(r.endDate)}
@@ -232,8 +247,9 @@ function RentalsPage() {
                     />
                     <DeleteRentalDialog
                       rentalId={r.id}
+                      billNo={r.billNo}
                       disabled={deletingId === r.id}
-                      onDelete={() => handleDelete(r.id)}
+                      onDelete={() => handleDelete(r.id, r.billNo)}
                     />
                   </div>
                 </div>
@@ -246,7 +262,7 @@ function RentalsPage() {
       {/* Tablet/desktop: table */}
       <Card className="glass-panel overflow-hidden p-0 hidden sm:block">
         <div className="overflow-x-auto">
-        <Table className="min-w-160">
+        <Table className="w-full min-w-200">
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
               <TableHead className="text-[10px] uppercase tracking-[0.25em]">
@@ -292,7 +308,7 @@ function RentalsPage() {
                   className="border-border hover:bg-secondary/30 cursor-pointer"
                 >
                   <TableCell className="text-xs text-muted-foreground tracking-wider">
-                    {r.id}
+                    {r.billNo || r.id}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -351,8 +367,9 @@ function RentalsPage() {
                       />
                       <DeleteRentalDialog
                         rentalId={r.id}
+                        billNo={r.billNo}
                         disabled={deletingId === r.id}
-                        onDelete={() => handleDelete(r.id)}
+                        onDelete={() => handleDelete(r.id, r.billNo)}
                       />
                     </div>
                   </TableCell>
@@ -369,10 +386,12 @@ function RentalsPage() {
 
 function DeleteRentalDialog({
   rentalId,
+  billNo,
   disabled,
   onDelete,
 }: {
   rentalId: string;
+  billNo?: string;
   disabled: boolean;
   onDelete: () => Promise<void> | void;
 }) {
@@ -401,7 +420,7 @@ function DeleteRentalDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="font-display text-2xl">
-            Delete rental {rentalId}?
+            Delete order {billNo || rentalId}?
           </AlertDialogTitle>
           <AlertDialogDescription>
             This will remove this rented item record from the rentals ledger.

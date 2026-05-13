@@ -45,6 +45,7 @@ export interface Rental {
   deliveryDate: string;
   startDate: string;
   endDate: string;
+  rate?: number;
   discount: number;
   remark: string;
   remarkCompleted?: boolean;

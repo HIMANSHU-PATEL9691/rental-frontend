@@ -36,12 +36,15 @@ const SUBCATEGORY_BY_CATEGORY = {
     "Accessories"
   ],
   "Women's": [
-    "Lehanga", 
-    "Sider jewellery", 
+    "Lehanga",
+    "Sider jewellery",
     "Bridal jewellery",
-    "Accessories"
-  ]
+    "Gown",
+    "Rajputana Dress",
+    "Accessories",
+  ],
 };
+
 
 function InventoryItemCard({ item, role, deletingId, handleDelete }: { item: any; role: string; deletingId: string | null; handleDelete: (id: string, name: string) => void; }) {
   const [imgIndex, setImgIndex] = useState(0);
@@ -190,9 +193,48 @@ function InventoryPage() {
     return matchesCategory && matchesSubcategory && (!query || searchable.includes(query));
   });
 
-  const subcategories = activeCategory !== "All" 
-    ? SUBCATEGORY_BY_CATEGORY[activeCategory as keyof typeof SUBCATEGORY_BY_CATEGORY] || []
-    : [];
+  const subcategories =
+    activeCategory !== "All"
+      ? SUBCATEGORY_BY_CATEGORY[activeCategory as keyof typeof SUBCATEGORY_BY_CATEGORY] || []
+      : [];
+
+  // Counts for UI chips (respects current search query)
+  const normalizedQuery = query;
+  const searchableFor = (i: any) =>
+    [
+      i.customId,
+      i.name,
+      i.designer,
+      i.category,
+      i.subcategory,
+      i.size,
+      i.color,
+      i.status,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+  const matchesSearch = (i: any) =>
+    !normalizedQuery || searchableFor(i).includes(normalizedQuery);
+
+  const availableItems = items.filter(matchesSearch);
+
+  const categoryCounts: Record<string, number> = Object.values(CATEGORIES).reduce(
+    (acc, c) => {
+      acc[c] = availableItems.filter((i: any) => i.category === c).length;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
+  const typeCounts: Record<string, number> = availableItems.reduce(
+    (acc: Record<string, number>, i: any) => {
+      acc[i.subcategory] = (acc[i.subcategory] || 0) + 1;
+      return acc;
+    },
+    {}
+  );
+
 
   async function handleDelete(id: string, name: string) {
     console.info("[InventoryPage] delete requested", { id, name });
@@ -344,22 +386,29 @@ function InventoryPage() {
       <div className="mb-6 sm:mb-8">
         <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">Category</h3>
         <div className="flex flex-wrap gap-2 -mx-1 px-1 overflow-x-auto sm:overflow-visible">
-          {["All", ...Object.values(CATEGORIES)].map((c) => (
-            <button
-              key={c}
-              onClick={() => {
-                setActiveCategory(c);
-                setActiveSubcategory("All");
-              }}
-              className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-xs uppercase tracking-[0.18em] sm:tracking-[0.2em] border transition-colors ${
-                activeCategory === c
-                  ? "bg-gold text-gold-foreground border-gold"
-                  : "border-border text-muted-foreground hover:text-foreground hover:border-gold/40"
-              }`}
-            >
-              {c}
-            </button>
-          ))}
+          {["All", ...Object.values(CATEGORIES)].map((c) => {
+            const count = c === "All" ? availableItems.length : categoryCounts[c] ?? 0;
+            return (
+              <button
+                key={c}
+                onClick={() => {
+                  setActiveCategory(c);
+                  setActiveSubcategory("All");
+                }}
+                className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-xs uppercase tracking-[0.18em] sm:tracking-[0.2em] border transition-colors ${
+                  activeCategory === c
+                    ? "bg-gold text-gold-foreground border-gold"
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-gold/40"
+                }`}
+              >
+                <span className="mr-1">{c}</span>
+                <span className={`text-[10px] ${
+                  activeCategory === c ? "text-gold-foreground/90" : "text-muted-foreground"
+                }`}>({count})</span>
+              </button>
+            );
+          })}
+
         </div>
       </div>
 
@@ -377,9 +426,13 @@ function InventoryPage() {
                     : "border-border text-muted-foreground hover:text-foreground hover:border-accent/40"
                 }`}
               >
-                {s}
+                <span className="mr-1">{s}</span>
+                <span className={`text-[10px] ${
+                  activeSubcategory === s ? "text-accent-foreground/90" : "text-muted-foreground"
+                }`}>({s === "All" ? availableItems.filter((i:any)=> i.category === activeCategory).length : typeCounts[s] ?? 0})</span>
               </button>
             ))}
+
           </div>
         </div>
       )}

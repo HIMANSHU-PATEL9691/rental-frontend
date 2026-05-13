@@ -13,11 +13,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileText, Filter, UserCheck, UserX, Trash2, Calendar } from "lucide-react";
+import { FileText, Filter, UserCheck, UserX, Trash2, Calendar, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+
 import { toast } from "sonner";
 import { authApi, type User } from "@/lib/api";
+import * as XLSX from "xlsx";
 
 function formatDate(dateStr: string) {
   if (!dateStr) return "";
@@ -58,8 +60,13 @@ function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [staffList, setStaffList] = useState<User[]>([]);
 
-  const pendingStaff = staffList.filter((s) => s.status === 'pending' || !s.status);
-  const approvedStaff = staffList.filter((s) => s.status !== 'pending' && s.status);
+  const pendingStaff = staffList.filter((s) => s.status === "pending" || !s.status);
+  const approvedStaff = staffList.filter((s) => s.status !== "pending" && s.status);
+
+
+  const safeString = (v: string | undefined) => v ?? "";
+  const safePhoneOrEmail = (s: User) => safeString(s.id || (s as any).phone || (s as any).email);
+  const getPhoneEmail = (s: User) => (safeString((s as any).phone) || safeString((s as any).email));
 
   const filteredRentals = useMemo(() => {
     if (reportType === "daily") {
@@ -142,6 +149,74 @@ function ReportsPage() {
     }
   };
 
+  const handleExportExcel = () => {
+    let exportData: any[] = [];
+    let filename = "Report.xlsx";
+    let sheetName = "Report";
+
+    if (reportType === "daily" || reportType === "monthly") {
+      if (filteredRentals.length === 0) {
+        toast.error("No data to export for this period");
+        return;
+      }
+      exportData = filteredRentals.map((r) => {
+        const client = customers.find((c) => c.id === r.customerId);
+        const item = items.find((i) => i.id === r.itemId);
+        return {
+          "Date": formatDate((r.createdAt || r.startDate || "").slice(0, 10)),
+          "Bill No": r.billNo || r.id,
+          "Client Name": client?.name || "Unknown",
+          "Client Phone": client?.phone || "-",
+          "Piece": item?.name || "Unknown",
+          "Item No": r.itemNo || r.itemId,
+          "Status": r.status,
+          "Total Value (INR)": r.total || 0,
+          "Advance Paid (INR)": r.advance || 0,
+          "Discount (INR)": r.discount || 0,
+        };
+      });
+      filename = reportType === "daily" ? `Daily_Report_${selectedDate}.xlsx` : `Monthly_Report_${selectedMonth}.xlsx`;
+      sheetName = "Bookings";
+    } else if (reportType === "items") {
+      if (itemStats.length === 0) {
+        toast.error("No items data to export");
+        return;
+      }
+      exportData = itemStats.map((item) => ({
+        "Item ID": item.id,
+        "Item No": item.customId || "-",
+        "Piece": item.name,
+        "Designer": item.designer || "-",
+        "Category": item.category || "-",
+        "Subcategory": item.subcategory || "-",
+        "Total Rentals": item.rentalCount,
+        "Revenue Generated (INR)": item.revenue,
+      }));
+      filename = "Items_Performance_Report.xlsx";
+      sheetName = "Item Performance";
+    } else if (reportType === "staff") {
+      if (staffList.length === 0) {
+        toast.error("No staff data to export");
+        return;
+      }
+      exportData = staffList.map((staff) => ({
+        "Name": staff.name,
+        "Phone": (staff as any).phone || "-",
+        "Email": (staff as any).email || "-",
+        "Status": staff.status === "active" ? "Approved Active" : "Pending",
+        "Role": staff.role || "employee",
+      }));
+      filename = "Staff_Report.xlsx";
+      sheetName = "Staff List";
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, filename);
+    toast.success(`${filename} exported successfully!`);
+  };
+
   if (loading) {
     return (
       <AppShell>
@@ -165,20 +240,28 @@ function ReportsPage() {
             View daily and monthly booking and revenue reports.
           </p>
         </div>
+        <Button 
+          onClick={handleExportExcel} 
+          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 w-full sm:w-auto shrink-0"
+        >
+          <Download className="w-4 h-4" /> Export Excel
+        </Button>
       </div>
 
       <Tabs value={reportType} onValueChange={(v) => setReportType(v as "daily" | "monthly" | "items" | "staff")} className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <TabsList>
-            <TabsTrigger value="daily">Daily Report</TabsTrigger>
-            <TabsTrigger value="monthly">Monthly Report</TabsTrigger>
-            <TabsTrigger value="items">Item Report</TabsTrigger>
-            <TabsTrigger value="staff">Staff Report</TabsTrigger>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <TabsList className="flex flex-wrap h-auto w-full sm:w-auto justify-start gap-1 sm:gap-0">
+            <TabsTrigger value="daily" className="flex-1 sm:flex-none text-xs sm:text-sm">Daily</TabsTrigger>
+            <TabsTrigger value="monthly" className="flex-1 sm:flex-none text-xs sm:text-sm">Monthly</TabsTrigger>
+            <TabsTrigger value="items" className="flex-1 sm:flex-none text-xs sm:text-sm">Items</TabsTrigger>
+            <TabsTrigger value="staff" className="flex-1 sm:flex-none text-xs sm:text-sm">Staff</TabsTrigger>
           </TabsList>
           
           {reportType !== "items" && reportType !== "staff" && (
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
+              {/* keep header responsive on mobile */}
+
               {reportType === "daily" ? (
                 <div className="relative w-full sm:w-40 shrink-0">
                   <Input value={formatDate(selectedDate)} readOnly className="pr-8 bg-card border-border" />
@@ -222,7 +305,7 @@ function ReportsPage() {
                 </CardTitle>
               </CardHeader>
               <div className="overflow-x-auto border-t border-border">
-                <Table>
+                <Table className="w-full">
                   <TableHeader>
                     <TableRow className="border-border bg-secondary/40">
                       <TableHead className="text-xs uppercase tracking-wider">Employee Details</TableHead>
@@ -245,12 +328,24 @@ function ReportsPage() {
                             <span className="px-2 py-0.5 rounded-full text-[10px] uppercase tracking-widest font-medium bg-gold/10 text-gold border border-gold/20">Pending</span>
                           </TableCell>
                           <TableCell className="text-right align-top pt-4">
-                            <div className="flex justify-end gap-2">
-                              <Button size="sm" className="bg-gold text-gold-foreground hover:bg-gold/90 h-8" onClick={() => updateUserStatus(staff.id || staff.phone || staff.email, "active", `Approved ${staff.name}`)}>
-                                <UserCheck className="w-4 h-4 mr-1" /> Approve
+                            <div className="flex flex-col sm:flex-row justify-end gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-gold text-gold-foreground hover:bg-gold/90 h-8 w-full sm:w-auto"
+                                onClick={() => updateUserStatus(safePhoneOrEmail(staff), "active", `Approved ${staff.name}`)}
+                              >
+                                <UserCheck className="w-4 h-4 mr-2 sm:mr-1" /> Approve
                               </Button>
-                              <Button size="sm" variant="destructive" className="h-8" onClick={() => window.confirm(`Reject ${staff.name}?`) && removeUser(staff.id || staff.phone || staff.email, `Rejected ${staff.name}`)}>
-                                <UserX className="w-4 h-4 mr-1" /> Reject
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="h-8 w-full sm:w-auto"
+                                onClick={() =>
+                                  window.confirm(`Reject ${staff.name}?`) &&
+                                  removeUser(safePhoneOrEmail(staff), `Rejected ${staff.name}`)
+                                }
+                              >
+                                <UserX className="w-4 h-4 mr-2 sm:mr-1" /> Reject
                               </Button>
                             </div>
                           </TableCell>
@@ -270,7 +365,7 @@ function ReportsPage() {
                 </CardTitle>
               </CardHeader>
               <div className="overflow-x-auto border-t border-border">
-                <Table>
+                <Table className="w-full">
                   <TableHeader>
                     <TableRow className="border-border bg-secondary/40">
                       <TableHead className="text-xs uppercase tracking-wider">Staff Member</TableHead>
@@ -293,12 +388,12 @@ function ReportsPage() {
                             <span className="px-2 py-0.5 rounded-full text-[10px] uppercase tracking-widest font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Approved Active</span>
                           </TableCell>
                           <TableCell className="text-right align-top pt-4">
-                            <div className="flex justify-end items-center gap-2">
-                              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => updateUserStatus(staff.id || staff.phone || staff.email, "pending", `Revoked access for ${staff.name}`)}>
+                            <div className="flex flex-col sm:flex-row justify-end items-end sm:items-center gap-2">
+                              <Button size="sm" variant="outline" className="h-8 text-xs w-full sm:w-auto" onClick={() => updateUserStatus(safePhoneOrEmail(staff), "pending", `Revoked access for ${staff.name}`)}>
                                 Revoke
                               </Button>
-                              <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => window.confirm(`Completely delete ${staff.name}?`) && removeUser(staff.id || staff.phone || staff.email, `Deleted account for ${staff.name}`)}>
-                                <Trash2 className="w-4 h-4" />
+                              <Button variant="destructive" className="h-8 w-full sm:w-8 px-2 sm:p-0 flex items-center justify-center" onClick={() => window.confirm(`Completely delete ${staff.name}?`) && removeUser(safePhoneOrEmail(staff), `Deleted account for ${staff.name}`)}>
+                                <Trash2 className="w-4 h-4" /> <span className="ml-2 sm:hidden text-xs">Delete</span>
                               </Button>
                             </div>
                           </TableCell>
@@ -316,7 +411,7 @@ function ReportsPage() {
               <CardTitle className="text-lg">All-Time Item Performance</CardTitle>
             </CardHeader>
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="w-full min-w-200">
                 <TableHeader>
                   <TableRow className="border-border">
                     <TableHead className="text-xs uppercase tracking-wider">Item ID</TableHead>
@@ -364,7 +459,7 @@ function ReportsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="font-display text-3xl">{stats.newRentalsCount}</div>
+                  <div className="font-display text-2xl sm:text-3xl truncate">{stats.newRentalsCount}</div>
                 </CardContent>
               </Card>
               <Card className="glass-panel">
@@ -374,7 +469,7 @@ function ReportsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="font-display text-3xl text-gold">{formatCurrencyINR(stats.totalIncome)}</div>
+                  <div className="font-display text-2xl sm:text-3xl text-gold truncate">{formatCurrencyINR(stats.totalIncome)}</div>
                 </CardContent>
               </Card>
               <Card className="glass-panel">
@@ -384,7 +479,7 @@ function ReportsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="font-display text-3xl text-emerald-500">{formatCurrencyINR(stats.totalAdvance)}</div>
+                  <div className="font-display text-2xl sm:text-3xl text-emerald-500 truncate">{formatCurrencyINR(stats.totalAdvance)}</div>
                 </CardContent>
               </Card>
               <Card className="glass-panel">
@@ -394,7 +489,7 @@ function ReportsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="font-display text-3xl">{formatCurrencyINR(stats.totalDiscount)}</div>
+                  <div className="font-display text-2xl sm:text-3xl truncate">{formatCurrencyINR(stats.totalDiscount)}</div>
                 </CardContent>
               </Card>
             </div>
@@ -406,7 +501,7 @@ function ReportsPage() {
                 </CardTitle>
               </CardHeader>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="w-full min-w-200">
                   <TableHeader>
                     <TableRow className="border-border">
                       <TableHead className="text-xs uppercase tracking-wider">Date</TableHead>

@@ -3,7 +3,7 @@ import { useStore } from "@/data/store";
 import { formatCurrencyINR } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Package, CheckCircle, Calendar, ArrowDownLeft } from "lucide-react";
+import { Package, CheckCircle, Calendar, ArrowDownLeft, Search } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
@@ -32,6 +32,7 @@ export function DeliveriesPage() {
   const [role, setRole] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => today());
   const [statusFilter, setStatusFilter] = useState("all");
+  const [localSearch, setLocalSearch] = useState("");
   const [updating, setUpdating] = useState<string | null>(null);
   const canUpdateDeliveries = role === "admin";
 
@@ -40,6 +41,7 @@ export function DeliveriesPage() {
   }, []);
 
   const deliveriesList = useMemo(() => {
+    const query = localSearch.trim().toLowerCase();
     const targetStr = selectedDate.slice(0, 10);
     return rentals
       .filter((r) => {
@@ -66,8 +68,20 @@ export function DeliveriesPage() {
         const item = items.find((i) => i.id === rental.itemId);
         const customer = customers.find((c) => c.id === rental.customerId);
         return { ...rental, customer, item };
+      })
+      .filter((r) => {
+        if (!query) return true;
+        const searchable = [
+          r.billNo,
+          r.itemNo,
+          r.itemId,
+          r.id,
+          r.customer?.name,
+          r.customer?.phone
+        ].filter(Boolean).join(" ").toLowerCase();
+        return searchable.includes(query);
       });
-  }, [rentals, items, customers, selectedDate, statusFilter]);
+  }, [rentals, items, customers, selectedDate, statusFilter, localSearch]);
 
   const handleStatusUpdate = async (rental: any, newStatus: string, message: string) => {
     setUpdating(rental.id);
@@ -107,6 +121,15 @@ export function DeliveriesPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:w-48">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search bill, item no..." 
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              className="pl-9 w-full bg-card border-border"
+            />
+          </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-35 bg-card border-border">
               <SelectValue placeholder="Filter Status" />
@@ -138,8 +161,9 @@ export function DeliveriesPage() {
       </div>
 
       <div className="rounded-md border border-border bg-card overflow-hidden">
-        <div className="w-full overflow-auto">
-          <table className="w-full caption-bottom text-sm">
+        <div className="w-full overflow-x-auto">
+<table className="w-full min-w-200 caption-bottom text-sm">
+
             <thead className="[&_tr]:border-b bg-secondary/40">
               <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Order Info</th>

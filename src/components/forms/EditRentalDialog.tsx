@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 
@@ -69,6 +69,19 @@ function daysBetween(start: string, end: string) {
   return Math.max(1, Math.round((e - s) / 86400000));
 }
 
+function getRentalAmount(rental: Rental, itemPriceFallback = 0) {
+  const savedRate = Number((rental as any).rate);
+  if (Number.isFinite(savedRate) && savedRate > 0) return savedRate;
+
+  const savedTotal = Number(rental.total);
+  const savedDiscount = Number(rental.discount);
+  if (Number.isFinite(savedTotal) && savedTotal > 0) {
+    return savedTotal + (Number.isFinite(savedDiscount) ? savedDiscount : 0);
+  }
+
+  return itemPriceFallback;
+}
+
 const DEFAULT_POLICIES = `1. Please return the rented piece on or before the due date to avoid penalty charges.\n2. Any damage, burns, or alterations to the piece will incur additional fees.\n3. Booking advance is strictly non-refundable.\n4. Original ID proof must be deposited at the time of pickup.\n\n1. कृपया पेनल्टी शुल्क से बचने के लिए किराए पर ली गई ड्रेस को नियत तारीख पर या उससे पहले वापस करें।\n2. ड्रेस में किसी भी प्रकार का नुकसान, जलने या बदलाव होने पर अतिरिक्त शुल्क लिया जाएगा।\n3. बुकिंग एडवांस वापस नहीं किया जाएगा।\n4. पिकअप के समय मूल आईडी प्रूफ जमा करना अनिवार्य है।`;
 function getPoliciesHtml() {
   const policies = typeof window !== "undefined" ? localStorage.getItem("rental_policies") ?? DEFAULT_POLICIES : DEFAULT_POLICIES;
@@ -101,7 +114,10 @@ export function EditRentalDialog({
     deliveryDate: rental.deliveryDate ? rental.deliveryDate.slice(0, 10) : today(),
     startDate: rental.startDate ? rental.startDate.slice(0, 10) : today(),
     endDate: rental.endDate ? rental.endDate.slice(0, 10) : today(),
-    rate: (rental as any).rate ?? (rentalItem ? rentalItem.pricePerDay * daysBetween(rental.startDate || today(), rental.endDate || today()) : 0),
+    rate: getRentalAmount(
+      rental,
+      rentalItem ? rentalItem.pricePerDay * daysBetween(rental.startDate || today(), rental.endDate || today()) : 0,
+    ),
     discount: rental.discount ?? 0,
     penalty: rental.penalty ?? 0,
     advance: rental.advance ?? 0,
@@ -110,6 +126,43 @@ export function EditRentalDialog({
     signature: (rental.signature as string | undefined) ?? "",
     status: (rental.status ?? "upcoming") as RentalStatus,
   });
+
+  const [billNoLoading, setBillNoLoading] = useState(false);
+
+  async function ensureBillNo() {
+    if (form.billNo?.trim()) return;
+    setBillNoLoading(true);
+
+    // Find gaps and reuse the lowest available deleted bill number
+    const existingNos = rentals
+      .map((r) => r.billNo)
+      .filter(Boolean)
+      .map((b) => {
+        const match = String(b).match(/BILL-(\d+)/i);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter((n) => n > 0);
+
+    const sorted = Array.from(new Set(existingNos)).sort((a, b) => a - b);
+    let nextSeq = 1;
+    for (const num of sorted) {
+      if (num === nextSeq) {
+        nextSeq++;
+      } else if (num > nextSeq) {
+        break;
+      }
+    }
+
+    setForm((c) => ({ ...c, billNo: `BILL-${String(nextSeq).padStart(4, "0")}` }));
+    setBillNoLoading(false);
+  }
+
+  useEffect(() => {
+    if (open && !form.billNo) {
+      ensureBillNo();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const subtotal = form.rate || 0;
   const totalAfterDiscount = Math.max(0, subtotal - form.discount);
@@ -137,7 +190,9 @@ export function EditRentalDialog({
     const rEndDate = isCurrent ? form.endDate : (r.endDate || "");
     const rDeliveryDate = isCurrent ? form.deliveryDate : (r.deliveryDate || "");
     const d = daysBetween(rStartDate, rEndDate);
-    const rRate = isCurrent ? form.rate : ((r as any).rate ?? (rItem ? rItem.pricePerDay * daysBetween(rStartDate, rEndDate) : 0));
+    const rRate = isCurrent
+      ? form.rate
+      : getRentalAmount(r, rItem ? rItem.pricePerDay * daysBetween(rStartDate, rEndDate) : 0);
     const rSubtotal = rRate;
     
     aggSubtotal += rSubtotal;
@@ -546,6 +601,7 @@ Thank you for choosing ARIHANT COLLECTION!`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    await ensureBillNo();
     const parsed = schema.safeParse(form);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
@@ -621,14 +677,14 @@ Thank you for choosing ARIHANT COLLECTION!`;
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="grid gap-2">
               <Label htmlFor="billNo">Bill No</Label>
               <Input
                 id="billNo"
                 value={form.billNo}
                 onChange={(e) => setForm((c) => ({ ...c, billNo: e.target.value }))}
-                placeholder="Enter bill number"
+                placeholder={billNoLoading ? "Generating..." : "Enter bill number"}
                 maxLength={40}
               />
             </div>
@@ -672,8 +728,8 @@ Thank you for choosing ARIHANT COLLECTION!`;
             </div>
           </div>
 
-          <div className="grid grid-cols-5 gap-3">
-            <div className="col-span-2 grid gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="md:col-span-2 grid gap-2">
               <Label htmlFor="address">Delivery Address</Label>
               <Input
                 id="address"
@@ -735,7 +791,7 @@ Thank you for choosing ARIHANT COLLECTION!`;
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div className="grid gap-2">
               <Label htmlFor="discount">Discount</Label>
               <Input
@@ -778,7 +834,7 @@ Thank you for choosing ARIHANT COLLECTION!`;
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="remark">Remark</Label>
               <Textarea
@@ -786,12 +842,11 @@ Thank you for choosing ARIHANT COLLECTION!`;
                 value={form.remark}
                 onChange={(e) => setForm((c) => ({ ...c, remark: e.target.value }))}
                 placeholder="Any special notes"
-                rows={3}
-                className="resize-none"
+                rows={4}
               />
             </div>
 
-            <div className="grid gap-2">
+            <div className="grid gap-2 sm:max-w-sm">
               <Label htmlFor="signature">Owner Signature</Label>
               <div className="grid gap-2 rounded-md border border-border bg-secondary/30 p-2">
                 {form.signature ? (

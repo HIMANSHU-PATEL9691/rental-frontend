@@ -45,7 +45,9 @@ const SUBCATEGORY_BY_CATEGORY = {
     "Lehanga", 
     "Sider jewellery", 
     "Bridal jewellery",
-    "Accessories"
+    "Accessories",
+    "Gown",
+    "Rajputana Dress"
   ]
 };
 
@@ -189,153 +191,160 @@ export function EditPieceDialog({
           <DialogDescription>Update inventory details.</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="customId">Item No</Label>
-              <Input
-                id="customId"
-                value={form.customId}
-                onChange={(e) => setForm((c) => ({ ...c, customId: e.target.value }))}
-                placeholder="e.g. VV-1234"
-                maxLength={40}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={form.name}
-                onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
-                placeholder="Onyx Tuxedo Coat"
-                maxLength={80}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="designer">Designer</Label>
-              <Input
-                id="designer"
-                value={form.designer}
-                onChange={(e) => setForm((c) => ({ ...c, designer: e.target.value }))}
-                placeholder="Maison Noir"
-                maxLength={60}
-                required
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={form.category}
-                onValueChange={(v) => {
-                  const firstSub =
-                    SUBCATEGORY_BY_CATEGORY[v as keyof typeof SUBCATEGORY_BY_CATEGORY]?.[0] ?? "";
-                  setForm((c) => ({ ...c, category: v, subcategory: firstSub }));
-                }}
-              >
-                <SelectTrigger id="category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(CATEGORIES).map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <form onSubmit={handleSubmit} className="space-y-6 mt-2">
+          {/* Identity Section */}
+          <div className="space-y-4 rounded-lg border border-border bg-secondary/10 p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border pb-2">Item Identity</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="customId">Item No</Label>
+                <Input
+                  id="customId"
+                  value={form.customId}
+                  onChange={(e) => setForm((c) => ({ ...c, customId: e.target.value }))}
+                  placeholder="e.g. VV-1234"
+                  maxLength={40}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={form.name}
+                  onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
+                  placeholder="Onyx Tuxedo Coat"
+                  maxLength={80}
+                  required
+                />
+              </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="designer">Designer</Label>
+                <Input
+                  id="designer"
+                  value={form.designer}
+                  onChange={(e) => setForm((c) => ({ ...c, designer: e.target.value }))}
+                  placeholder="Maison Noir"
+                  maxLength={60}
+                  required
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="subcategory">Subcategory</Label>
-            <Select
-              value={form.subcategory}
-              onValueChange={(v) => setForm((c) => ({ ...c, subcategory: v }))}
-            >
-              <SelectTrigger id="subcategory">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SUBCATEGORY_BY_CATEGORY[form.category as keyof typeof SUBCATEGORY_BY_CATEGORY]?.map(
-                  (s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ),
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="size">Size</Label>
-              <Select
-                value={form.size}
-                onValueChange={(v) => setForm((c) => ({ ...c, size: v }))}
-              >
-                <SelectTrigger id="size">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["XS", "S", "M", "L", "XL"].map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* Classification Section */}
+          <div className="space-y-4 rounded-lg border border-border bg-secondary/10 p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border pb-2">Classification</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="category">Category</Label>
+                <Select
+                  value={form.category}
+                  onValueChange={(v) => {
+                    const firstSub =
+                      SUBCATEGORY_BY_CATEGORY[v as keyof typeof SUBCATEGORY_BY_CATEGORY]?.[0] ?? "";
+                    setForm((c) => ({ ...c, category: v, subcategory: firstSub }));
+                  }}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(CATEGORIES).map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="subcategory">Subcategory</Label>
+                <Select
+                  value={form.subcategory}
+                  onValueChange={(v) => setForm((c) => ({ ...c, subcategory: v }))}
+                >
+                  <SelectTrigger id="subcategory">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUBCATEGORY_BY_CATEGORY[form.category as keyof typeof SUBCATEGORY_BY_CATEGORY]?.map(
+                      (s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="size">Size</Label>
+                <Select
+                  value={form.size}
+                  onValueChange={(v) => setForm((c) => ({ ...c, size: v }))}
+                >
+                  <SelectTrigger id="size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["XS", "S", "M", "L", "XL"].map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="color">Color</Label>
+                <Input
+                  id="color"
+                  value={form.color}
+                  onChange={(e) => setForm((c) => ({ ...c, color: e.target.value }))}
+                  placeholder="Emerald"
+                  maxLength={30}
+                  required
+                />
+              </div>
             </div>
+          </div>
 
-            <div className="grid gap-2 col-span-2">
-              <Label htmlFor="color">Color</Label>
-              <Input
-                id="color"
-                value={form.color}
-                onChange={(e) => setForm((c) => ({ ...c, color: e.target.value }))}
-                placeholder="Emerald"
-                maxLength={30}
-                required
-              />
+          {/* Pricing & Status Section */}
+          <div className="space-y-4 rounded-lg border border-border bg-secondary/10 p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border pb-2">Pricing & Status</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="price">Rental value (INR)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  min={0}
+                  value={form.pricePerDay}
+                  onChange={(e) => setForm((c) => ({ ...c, pricePerDay: Number(e.target.value) }))}
+                  placeholder={formatCurrencyINR(95)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={form.status}
+                  onValueChange={(v: ItemStatus) => setForm((c) => ({ ...c, status: v }))}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["available", "rented", "cleaning", "reserved"] as const).map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s[0].toUpperCase() + s.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="price">Rental value (INR)</Label>
-            <Input
-              id="price"
-              type="number"
-              min={0}
-              value={form.pricePerDay}
-              onChange={(e) => setForm((c) => ({ ...c, pricePerDay: Number(e.target.value) }))}
-              placeholder={formatCurrencyINR(95)}
-              required
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="status">Status</Label>
-            <Select
-              value={form.status}
-              onValueChange={(v: ItemStatus) => setForm((c) => ({ ...c, status: v }))}
-            >
-              <SelectTrigger id="status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(["available", "rented", "cleaning", "reserved"] as const).map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s[0].toUpperCase() + s.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="grid gap-2">
