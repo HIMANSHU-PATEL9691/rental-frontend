@@ -239,17 +239,17 @@ export function EditRentalDialog({
         <div class="thermal-row"><span>Advance/Paid</span><span>${formatCurrencyINR(aggAdvance)}</span></div>
         <div class="thermal-row thermal-total"><span>Balance Due</span><span>${formatCurrencyINR(aggFinalDue)}</span></div>
 
+        <div class="thermal-divider"></div>
+        <div style="font-size: 9px; margin-top: 10px; color: #444;">
+          <strong style="font-size: 10px; color: #111;">Terms & Conditions:</strong><br/>
+          ${getPoliciesHtml()}
+        </div>
+
         <div class="thermal-signs">
           <div class="thermal-sign-box">
             ${form.signature ? `<img src="${form.signature}" class="thermal-sign-img" />` : ""}
             <div class="thermal-sign-line">Authorized Signature</div>
           </div>
-        </div>
-
-        <div class="thermal-divider"></div>
-        <div style="font-size: 9px; margin-top: 10px; color: #444;">
-          <strong style="font-size: 10px; color: #111;">Terms & Conditions:</strong><br/>
-          ${getPoliciesHtml()}
         </div>
 
         <div class="thermal-footer">Thank you for choosing ARIHANT COLLECTION!</div>
@@ -460,7 +460,12 @@ Thank you for choosing ARIHANT COLLECTION!`;
           <div class="row total"><span>Balance Due</span><span>${formatCurrencyINR(aggFinalDue)}</span></div>
         </div>
 
-        <div class="signatures">
+        <div style="margin-top: 20px; font-size: 10px; color: #555; border-top: 1px solid #eaeaea; padding-top: 10px; line-height: 1.5;">
+          <strong style="color: #222; font-size: 11px;">Terms & Conditions:</strong><br/>
+          ${getPoliciesHtml()}
+        </div>
+
+        <div class="signatures" style="margin-top: 30px;">
           <div class="sign-box">
             ${form.signature ? `<img src="${form.signature}" class="sign-img" />` : ""}
             <p>Authorized Signature</p>
@@ -468,11 +473,6 @@ Thank you for choosing ARIHANT COLLECTION!`;
           <div class="sign-box">
             <p>Client Signature</p>
           </div>
-        </div>
-
-        <div style="margin-top: 30px; font-size: 10px; color: #555; border-top: 1px solid #eaeaea; padding-top: 10px; line-height: 1.5;">
-          <strong style="color: #222; font-size: 11px;">Terms & Conditions:</strong><br/>
-          ${getPoliciesHtml()}
         </div>
       </div>
     `;

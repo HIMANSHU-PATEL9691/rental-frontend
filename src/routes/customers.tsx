@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { useStore } from "@/data/store";
@@ -6,8 +7,20 @@ import { formatCurrencyINR } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Mail, Phone, Plus } from "lucide-react";
+import { Mail, Phone, Plus, Trash2 } from "lucide-react";
 import { AddCustomerDialog } from "@/components/forms/AddCustomerDialog";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/customers")({
   head: () => ({
@@ -49,9 +62,37 @@ function initials(name: string) {
 
 function CustomersPage() {
   const navigate = useNavigate();
-  const { customers, loading, searchQuery } = useStore();
+  const { customers, rentals, loading, searchQuery, deleteCustomer } = useStore();
   const query = searchQuery.trim().toLowerCase();
-  const filteredCustomers = customers.filter((c) => {
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDelete(id: string, name: string) {
+    setDeletingId(id);
+    try {
+      if (deleteCustomer) await deleteCustomer(id);
+      toast.success(`Client ${name} deleted`);
+    } catch (error) {
+      console.error(error);
+      toast.error(`Failed to delete client ${name}`);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  const customersWithLiveStats = useMemo(() => {
+    return customers.map(c => {
+      const customerRentals = rentals.filter(r => r.customerId === c.id);
+      const liveTotalSpent = customerRentals.reduce((sum, r) => sum + (r.total || 0) + (r.penalty || 0), 0);
+      return {
+        ...c,
+        rentals: customerRentals.length,
+        totalSpent: liveTotalSpent
+      };
+    });
+  }, [customers, rentals]);
+
+  const filteredCustomers = customersWithLiveStats.filter((c) => {
     const searchable = [
       c.id,
       c.name,
@@ -113,7 +154,7 @@ function CustomersPage() {
                   }
                 }}
               >
-            <CardContent className="p-6">
+            <CardContent className="p-6 relative">
               <div className="flex items-start gap-4">
                 <Avatar className="h-14 w-14 border border-gold/40">
                   <AvatarFallback className="bg-secondary font-display text-lg">
@@ -131,6 +172,13 @@ function CustomersPage() {
                 >
                   {c.tier}
                 </span>
+
+                <DeleteCustomerDialog
+                  customerId={c.id}
+                  customerName={c.name}
+                  disabled={deletingId === c.id}
+                  onDelete={() => handleDelete(c.id, c.name)}
+                />
               </div>
 
               <div className="mt-5 space-y-1.5 text-xs text-muted-foreground">
@@ -164,5 +212,63 @@ function CustomersPage() {
         ))}
       </div>
     </AppShell>
+  );
+}
+
+function DeleteCustomerDialog({
+  customerId,
+  customerName,
+  disabled,
+  onDelete,
+}: {
+  customerId: string;
+  customerName: string;
+  disabled: boolean;
+  onDelete: () => Promise<void> | void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const handleDelete = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await onDelete();
+    setOpen(false);
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 absolute top-4 right-4"
+          aria-label={`Delete client ${customerName}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-display text-2xl">
+            Delete client {customerName}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently remove this client from the database.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={disabled} onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={disabled}
+            onClick={handleDelete}
+          >
+            {disabled ? "Deleting..." : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

@@ -279,7 +279,12 @@ export function NewRentalDialog({
           <div class="row total"><span>Balance Due</span><span>${formatCurrencyINR(balanceDue)}</span></div>
         </div>
 
-        <div class="signatures">
+        <div style="margin-top: 20px; font-size: 10px; color: #555; border-top: 1px solid #eaeaea; padding-top: 10px; line-height: 1.5;">
+          <strong style="color: #222; font-size: 11px;">Terms & Conditions:</strong><br/>
+          ${getPoliciesHtml()}
+        </div>
+
+        <div class="signatures" style="margin-top: 30px;">
           <div class="sign-box">
             ${form.signature ? `<img src="${form.signature}" class="sign-img" />` : ""}
             <p>Authorized Signature</p>
@@ -287,11 +292,6 @@ export function NewRentalDialog({
           <div class="sign-box">
             <p>Client Signature</p>
           </div>
-        </div>
-        
-        <div style="margin-top: 30px; font-size: 10px; color: #555; border-top: 1px solid #eaeaea; padding-top: 10px; line-height: 1.5;">
-          <strong style="color: #222; font-size: 11px;">Terms & Conditions:</strong><br/>
-          ${getPoliciesHtml()}
         </div>
       </div>
     `;

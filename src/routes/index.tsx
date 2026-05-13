@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { AppShell } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useStore } from "@/data/store";
@@ -28,68 +28,191 @@ import {
 } from "lucide-react";
 import heroImg from "@/assets/hero-velvet.jpg";
 
+const PIE_COLORS = ["var(--gold)", "var(--gold-2)", "var(--gold-3)", "var(--gold-4)"];
+
+function formatDayLabel(date: Date) {
+  return date.toLocaleDateString(undefined, { weekday: "short" });
+}
+
 export const Route = createFileRoute("/")({
   head: () => ({
-    meta: [
-      { title: "Dashboard - Velvet Vault" },
-      {
-        name: "description",
-        content: "Atelier overview: revenue, active rentals, top pieces.",
-      },
-    ],
+    meta: [{ title: "Dashboard - Velvet Vault" }],
   }),
   beforeLoad: () => {
     if (typeof window !== "undefined") {
-      const role = localStorage.getItem("user_role")?.trim().toLowerCase();
-      if (!role) {
-        throw redirect({ to: "/login" });
-      }
-      if (role !== "admin") {
-        throw redirect({ to: "/availability" });
-      }
+      const role = localStorage.getItem("user_role");
+      if (!role) throw redirect({ to: "/login" });
+      if (role !== "admin") throw redirect({ to: "/availability" });
     }
   },
   component: DashboardPage,
 });
 
-const PIE_COLORS = [
-  "var(--gold)",
-  "var(--emerald)",
-  "var(--burgundy)",
-  "oklch(0.65 0.08 285)",
-];
-
-function formatMonthLabel(date: Date) {
-  return date.toLocaleString("en-US", { month: "short" });
-}
-
-function formatDayLabel(date: Date) {
-  return date.getDate().toString();
-}
-
 function DashboardPage() {
-  const [canViewDashboard, setCanViewDashboard] = useState(false);
-  const { items, customers, rentals, getItem, getCustomer, loading } = useStore();
+  const { items, customers, rentals, loading, getItem, getCustomer } = useStore();
 
-  useEffect(() => {
-    const role = localStorage.getItem("user_role")?.trim().toLowerCase();
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
 
-    if (!role) {
-      window.location.replace("/login");
-      return;
-    }
+  const dashboardStats = useMemo(() => {
+    let todayIncome = 0;
+    let todayDue = 0;
+    let todayRentalsCount = 0;
+    let monthIncome = 0;
+    let monthDue = 0;
+    let monthRentalsCount = 0;
 
-    if (role !== "admin") {
-      window.location.replace("/availability");
-      return;
-    }
+    rentals.forEach((r) => {
+      const rDateObj = new Date(r.startDate || (r as any).createdAt || "");
+      if (Number.isNaN(rDateObj.getTime())) return;
 
-    setCanViewDashboard(true);
-  }, []);
+      const rDateStr = rDateObj.toISOString().slice(0, 10);
+      const isToday = rDateStr === todayStr;
+      const isThisMonth =
+        rDateObj.getMonth() === currentMonth && rDateObj.getFullYear() === currentYear;
 
-  if (!canViewDashboard) {
-    return null;
-  }
+      const income = (r.advance as number) || 0;
+      const due = Math.max(0, (r.total as number) || 0 + ((r.penalty as number) || 0) - ((r.advance as number) || 0));
+
+      if (isToday) {
+        todayIncome += income;
+        todayDue += due;
+        todayRentalsCount++;
+      }
+      if (isThisMonth) {
+        monthIncome += income;
+        monthDue += due;
+        monthRentalsCount++;
+      }
+    });
+
+    const activeRentals = rentals.filter((r) => r.status === "active").length;
+    const availableItems = items.filter((i) => i.status === "available").length;
+
+    const returnsDueToday = rentals.filter(
+      (r) => r.status === "active" && (r.endDate || "").slice(0, 10) === todayStr,
+    ).length;
+    const upcomingRentals = rentals.filter((r) => r.status === "upcoming").length;
+    const itemsInCleaning = items.filter((i) => i.status === "cleaning").length;
+
+    const stats = [
+      {
+        label: "Today's Bookings",
+        value: `${todayRentalsCount}`,
+        helper: "Rentals starting today",
+        icon: CalendarCheck,
+      },
+      {
+        label: "Today's Income",
+        value: formatCurrencyINR(todayIncome),
+        helper: "Collected today (excl. security)",
+        icon: Banknote,
+      },
+      {
+        label: "Today's Due",
+        value: formatCurrencyINR(todayDue),
+        helper: "Pending from today's bookings",
+        icon: Clock,
+      },
+      {
+        label: "Monthly Bookings",
+        value: `${monthRentalsCount}`,
+        helper: "Rentals starting this month",
+        icon: CalendarCheck,
+      },
+      {
+        label: "Monthly Income",
+        value: formatCurrencyINR(monthIncome),
+        helper: "Collected this month",
+        icon: Banknote,
+      },
+      {
+        label: "Monthly Due",
+        value: formatCurrencyINR(monthDue),
+        helper: "Pending this month",
+        icon: Clock,
+      },
+      {
+        label: "Live Rentals",
+        value: `${activeRentals}`,
+        helper: `${rentals.filter((r) => r.status === "upcoming").length} upcoming`,
+        icon: Package,
+      },
+      {
+        label: "Overdue Items",
+        value: `${rentals.filter((r) => r.status === "overdue").length}`,
+        helper: "Needs immediate action",
+        icon: CalendarCheck,
+      },
+      {
+        label: "Clientele",
+        value: `${customers.length}`,
+        helper: `${customers.filter((c) => c.tier === "Platinum").length} platinum members`,
+        icon: Users,
+      },
+      {
+        label: "Available Pieces",
+        value: `${availableItems}`,
+        helper: `${items.length} total garments`,
+        icon: TrendingUp,
+      },
+    ];
+
+    const revenueByDay = (() => {
+      const grouped: Record<string, { date: Date; revenue: number }> = {};
+      rentals.forEach((rental) => {
+        const date = new Date(rental.startDate || rental.createdAt || "");
+        if (Number.isNaN(date.getTime())) return;
+        if (date.getMonth() !== currentMonth || date.getFullYear() !== currentYear) return;
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+          date.getDate(),
+        ).padStart(2, "0")}`;
+        grouped[key] = grouped[key] || { date, revenue: 0 };
+        grouped[key].revenue += (rental.advance as number) ?? 0;
+      });
+      return Object.values(grouped)
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+        .map((entry) => ({
+          day: formatDayLabel(entry.date),
+          revenue: entry.revenue,
+        }));
+    })();
+
+    const categoryMix = (() => {
+      const counts = items.reduce<Record<string, number>>((acc, item) => {
+        const key = item.category || "Uncategorized";
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      return Object.entries(counts).map(([name, value]) => ({
+        name,
+        value: Math.round((value / Math.max(items.length, 1)) * 100),
+      }));
+    })();
+
+    const recent = [...rentals]
+      .sort((a, b) => {
+        const aDate = new Date(a.startDate || (a as any).createdAt || "");
+        const bDate = new Date(b.startDate || (b as any).createdAt || "");
+        return bDate.getTime() - aDate.getTime();
+      })
+      .slice(0, 5);
+
+    const heroPiece = [...items].sort((a, b) => b.timesRented - a.timesRented)[0];
+
+    return {
+      stats,
+      revenueByDay,
+      categoryMix,
+      recent,
+      heroPiece,
+      returnsDueToday,
+      upcomingRentals,
+      itemsInCleaning,
+    };
+  }, [customers, currentMonth, currentYear, items, rentals]);
 
   if (loading) {
     return (
@@ -100,139 +223,6 @@ function DashboardPage() {
       </AppShell>
     );
   }
-
-  let todayIncome = 0;
-  let todayDue = 0;
-  let monthIncome = 0;
-  let monthDue = 0;
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-
-  rentals.forEach((r) => {
-    const rDateObj = new Date(r.startDate || r.createdAt || "");
-    if (isNaN(rDateObj.getTime())) return;
-
-    const rDateStr = rDateObj.toISOString().slice(0, 10);
-    const isToday = rDateStr === todayStr;
-    const isThisMonth = rDateObj.getMonth() === currentMonth && rDateObj.getFullYear() === currentYear;
-
-    const income = r.advance || 0;
-    const due = Math.max(0, (r.total || 0) + (r.penalty || 0) - (r.advance || 0));
-
-    if (isToday) {
-      todayIncome += income;
-      todayDue += due;
-    }
-    if (isThisMonth) {
-      monthIncome += income;
-      monthDue += due;
-    }
-  });
-
-  const activeRentals = rentals.filter((r) => r.status === "active").length;
-  const availableItems = items.filter((i) => i.status === "available").length;
-
-  const stats = [
-    {
-      label: "Today's Income",
-      value: formatCurrencyINR(todayIncome),
-      helper: "Collected today (excl. security)",
-      icon: Banknote,
-    },
-    {
-      label: "Today's Due",
-      value: formatCurrencyINR(todayDue),
-      helper: "Pending from today's bookings",
-      icon: Clock,
-    },
-    {
-      label: "Monthly Income",
-      value: formatCurrencyINR(monthIncome),
-      helper: "Collected this month",
-      icon: Banknote,
-    },
-    {
-      label: "Monthly Due",
-      value: formatCurrencyINR(monthDue),
-      helper: "Pending this month",
-      icon: Clock,
-    },
-    {
-      label: "Live Rentals",
-      value: `${activeRentals}`,
-      helper: `${rentals.filter((r) => r.status === "upcoming").length} upcoming`,
-      icon: Package,
-    },
-    {
-      label: "Overdue Items",
-      value: `${rentals.filter((r) => r.status === "overdue").length}`,
-      helper: "Needs immediate action",
-      icon: CalendarCheck,
-    },
-    {
-      label: "Clientele",
-      value: `${customers.length}`,
-      helper: `${customers.filter((c) => c.tier === "Platinum").length} platinum members`,
-      icon: Users,
-    },
-    {
-      label: "Available Pieces",
-      value: `${availableItems}`,
-      helper: `${items.length} total garments`,
-      icon: TrendingUp,
-    },
-  ];
-
-  const revenueByDay = (() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const grouped: Record<string, { date: Date; revenue: number }> = {};
-    rentals.forEach((rental) => {
-      const date = new Date(rental.startDate || rental.createdAt || "");
-      if (Number.isNaN(date.getTime())) return;
-      if (date.getMonth() !== currentMonth || date.getFullYear() !== currentYear) return;
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      grouped[key] = grouped[key] || { date, revenue: 0 };
-        grouped[key].revenue += rental.advance ?? 0;
-    });
-    return Object.values(grouped)
-      .sort((a, b) => a.date.getTime() - b.date.getTime())
-      .map((entry) => ({
-        day: formatDayLabel(entry.date),
-        revenue: entry.revenue,
-      }));
-  })();
-
-  const categoryMix = (() => {
-    const counts = items.reduce<Record<string, number>>((acc, item) => {
-      acc[item.category] = (acc[item.category] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(counts).map(([name, value]) => ({
-      name,
-      value: Math.round((value / Math.max(items.length, 1)) * 100),
-    }));
-  })();
-
-  const recent = [...rentals]
-    .sort((a, b) => {
-      const aDate = new Date(a.startDate || a.createdAt || "");
-      const bDate = new Date(b.startDate || b.createdAt || "");
-      return bDate.getTime() - aDate.getTime();
-    })
-    .slice(0, 5);
-
-  const heroPiece = [...items].sort((a, b) => b.timesRented - a.timesRented)[0];
-
-  const returnsDueToday = rentals.filter(
-    (r) => r.status === "active" && (r.endDate || "").slice(0, 10) === todayStr
-  ).length;
-  const upcomingRentals = rentals.filter((r) => r.status === "upcoming").length;
-  const itemsInCleaning = items.filter((i) => i.status === "cleaning").length;
 
   return (
     <AppShell>
@@ -245,18 +235,20 @@ function DashboardPage() {
                 Rental couture, handled with ceremony.
               </h1>
               <p className="mt-5 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-                A polished view of your pieces, bookings, client tiers, returns,
-                and revenue, designed for a premium dress hire studio.
+                A polished view of your pieces, bookings, client tiers, returns, and revenue.
               </p>
             </div>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
               {[
-                ["Returns", `${returnsDueToday} due today`],
-                ["Upcoming", `${upcomingRentals} bookings`],
-                ["Garment Care", `${itemsInCleaning} in cleaning`],
+                ["Returns", `${dashboardStats.returnsDueToday} due today`],
+                ["Upcoming", `${dashboardStats.upcomingRentals} bookings`],
+                ["Garment Care", `${dashboardStats.itemsInCleaning} in cleaning`],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-md border border-border bg-background/35 p-4">
+                <div
+                  key={label}
+                  className="rounded-md border border-border bg-background/35 p-4"
+                >
                   <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
                     {label}
                   </p>
@@ -275,12 +267,12 @@ function DashboardPage() {
               className="absolute inset-0 h-full w-full object-cover"
             />
             <div className="absolute inset-0 bg-linear-to-t from-background via-background/20 to-transparent lg:bg-linear-to-r lg:from-background/85 lg:via-background/20 lg:to-transparent" />
-            {heroPiece && (
+            {dashboardStats.heroPiece && (
               <div className="absolute bottom-5 left-5 right-5 rounded-md border border-border bg-background/65 p-4 backdrop-blur-md lg:left-auto lg:w-72">
                 <p className="eyebrow">Most Requested</p>
-                <p className="mt-2 font-display text-2xl">{heroPiece.name}</p>
+                <p className="mt-2 font-display text-2xl">{dashboardStats.heroPiece.name}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {heroPiece.designer} - {heroPiece.timesRented} rentals
+                  {dashboardStats.heroPiece.designer} - {dashboardStats.heroPiece.timesRented} rentals
                 </p>
               </div>
             )}
@@ -288,8 +280,8 @@ function DashboardPage() {
         </div>
       </section>
 
-      <section className="mb-8 grid grid-cols-2 gap-3 sm:mb-10 sm:gap-5 lg:grid-cols-4">
-        {stats.map((s) => {
+      <section className="mb-8 grid grid-cols-2 gap-3 sm:mb-10 sm:gap-5 lg:grid-cols-5">
+        {dashboardStats.stats.map((s) => {
           const Icon = s.icon;
           return (
             <Card key={s.label} className="glass-panel">
@@ -317,14 +309,21 @@ function DashboardPage() {
           </CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueByDay} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <AreaChart
+                data={dashboardStats.revenueByDay}
+                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+              >
                 <defs>
                   <linearGradient id="revenueGold" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--gold)" stopOpacity={0.55} />
                     <stop offset="100%" stopColor="var(--gold)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--border)"
+                  vertical={false}
+                />
                 <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={11} />
                 <YAxis stroke="var(--muted-foreground)" fontSize={11} />
                 <Tooltip
@@ -355,7 +354,7 @@ function DashboardPage() {
             <ResponsiveContainer width="100%" height="72%">
               <PieChart>
                 <Pie
-                  data={categoryMix}
+                  data={dashboardStats.categoryMix}
                   dataKey="value"
                   innerRadius={55}
                   outerRadius={88}
@@ -363,8 +362,11 @@ function DashboardPage() {
                   stroke="var(--background)"
                   strokeWidth={2}
                 >
-                  {categoryMix.map((c, i) => (
-                    <Cell key={c.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  {dashboardStats.categoryMix.map((c, i) => (
+                    <Cell
+                      key={c.name}
+                      fill={PIE_COLORS[i % PIE_COLORS.length]}
+                    />
                   ))}
                 </Pie>
                 <Tooltip
@@ -378,7 +380,7 @@ function DashboardPage() {
               </PieChart>
             </ResponsiveContainer>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              {categoryMix.map((c, i) => (
+              {dashboardStats.categoryMix.map((c, i) => (
                 <div key={c.name} className="flex items-center gap-2">
                   <span
                     className="h-2 w-2 rounded-full"
@@ -403,7 +405,7 @@ function DashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border">
-              {recent.map((r) => {
+              {dashboardStats.recent.map((r) => {
                 const item = getItem(r.itemId);
                 const customer = getCustomer(r.customerId);
                 if (!item || !customer) return null;
@@ -448,9 +450,10 @@ function DashboardPage() {
             {[...items]
               .sort((a, b) => b.timesRented - a.timesRented)
               .slice(0, 4)
-              .map((item, idx) => (
+              .map((item, index) => (
+
                 <div key={item.id} className="flex items-center gap-3">
-                  <span className="w-7 font-display text-3xl text-gold">{idx + 1}</span>
+<span className="w-7 font-display text-3xl text-gold">{index + 1}</span>
                   <img
                     src={item.image}
                     alt={item.name}
@@ -473,3 +476,4 @@ function DashboardPage() {
     </AppShell>
   );
 }
+

@@ -36,6 +36,7 @@ interface StoreState {
     customer: Omit<Customer, "_id" | "id" | "customId" | "totalSpent" | "rentals" | "joined" | "createdAt" | "updatedAt">,
   ) => Promise<Customer>;
   addRental: (rental: Omit<Rental, "_id" | "id" | "customId" | "createdAt" | "updatedAt">) => Promise<Rental>;
+  deleteCustomer: (id: string) => Promise<void>;
   deleteRental: (id: string) => Promise<void>;
   updateRental: (id: string, data: Partial<Rental>) => Promise<Rental>;
   updateItem: (id: string, data: Partial<Item>) => Promise<Item>;
@@ -43,6 +44,7 @@ interface StoreState {
   getCustomer: (id: string) => Customer | undefined;
   refreshData: () => Promise<void>;
 }
+
 
 const StoreContext = createContext<StoreState | null>(null);
 
@@ -129,6 +131,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<StoreState>(
     () => ({
+
       items,
       customers,
       rentals,
@@ -168,6 +171,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setItems((prev) => prev.filter((item) => item.id !== id));
         setRentals((prev) => prev.filter((rental) => rental.itemId !== id));
         console.info("[store] deleteItem state updated", { id });
+      },
+      deleteCustomer: async (id) => {
+        console.info("[store] deleteCustomer started", { id });
+        await customersApi.delete(id);
+        console.info("[store] deleteCustomer backend success", { id });
+        setCustomers((prev) => prev.filter((customer) => customer.id !== id));
+        // Optionally refresh to keep totals in sync
+        await refreshData();
+        console.info("[store] deleteCustomer state refreshed", { id });
       },
       addCustomer: async (data) => {
         console.info("[store] addCustomer started", data);
