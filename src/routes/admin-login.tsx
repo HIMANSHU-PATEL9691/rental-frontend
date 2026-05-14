@@ -22,7 +22,7 @@ function AdminLoginPage() {
     const trimmedPass = password.trim();
 
     // Mock Admin Authentication Logic
-    if ((trimmedUser === "admin@arihent" || trimmedUser === "admin") && trimmedPass === "arihent@123") {
+    if ((trimmedUser === "admin@arihent" || trimmedUser === "9039489995") && trimmedPass === "arihent@15") {
       localStorage.setItem("user_role", "admin");
       localStorage.setItem("user_name", "Admin");
       toast.success("Logged in as Admin");
