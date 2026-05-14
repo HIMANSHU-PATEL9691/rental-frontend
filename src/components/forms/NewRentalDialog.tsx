@@ -262,7 +262,7 @@ export function NewRentalDialog({
               const lineTot = p.rate || 0;
               return `<tr>
                 <td>${item?.image ? `<img src="${item.image}" style="width: 35px; height: 45px; object-fit: cover; border-radius: 3px;" />` : ""}</td>
-                <td><strong>${item?.name || "-"}</strong><br/><span style="font-size: 9px; color: #666;">${item?.designer || ""}</span><br/><span style="font-size: 9px; color: #666;">Del: ${formatDate(p.deliveryDate)} | Return: ${formatDate(p.endDate)}</span></td>
+                <td><strong>${item?.name || "-"}</strong><br/><span style="font-size: 9px; color: #666;">Del: ${formatDate(p.deliveryDate)} | Return: ${formatDate(p.endDate)}</span></td>
                 <td>${p.itemNo || "-"}</td>
                 <td class="text-right">${formatCurrencyINR(p.rate ?? 0)}</td>
                 <td class="text-right">${formatCurrencyINR(lineTot)}</td>

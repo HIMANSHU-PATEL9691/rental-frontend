@@ -49,7 +49,7 @@ function LoginPage() {
           <p className="text-sm text-muted-foreground mt-1">Sign in to your employee account</p>
         </div>
         
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number</Label>
             <Input 
@@ -58,6 +58,7 @@ function LoginPage() {
               placeholder="+91 98765 43210" 
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              autoComplete="off"
               required 
             />
           </div>
@@ -68,6 +69,7 @@ function LoginPage() {
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
               required 
             />
           </div>

@@ -214,12 +214,11 @@ export function EditRentalDialog({
     else if (form.status === "returned") invoiceTitle = "FINAL INVOICE";
     else if (form.status === "overdue") invoiceTitle = "OVERDUE FINAL BILL";
 
-    const thermalPiecesHtml = piecesData.map(({ r, rItem, rStartDate, rEndDate, rRate }) => `
+    const thermalPiecesHtml = piecesData.map(({ r, rItem, rDeliveryDate, rEndDate, rRate }) => `
       ${rItem?.image ? `<div style="text-align: center; margin-bottom: 6px;"><img src="${rItem.image}" style="max-height: 80px; max-width: 100%; border-radius: 4px; object-fit: cover;" /></div>` : ""}
       <div class="thermal-item-name">${rItem?.name || "Unknown item"}</div>
-      <div class="thermal-item-sub">${rItem?.designer || ""}</div>
       <div class="thermal-row"><span>Item No</span><span>${r.itemNo || r.itemId}</span></div>
-      <div class="thermal-row"><span>Dates</span><span>${formatDate(rStartDate.slice(0, 10))} to ${formatDate(rEndDate.slice(0, 10))}</span></div>
+      <div class="thermal-row"><span>Dates</span><span>Del: ${formatDate(rDeliveryDate.slice(0, 10))} | Return: ${formatDate(rEndDate.slice(0, 10))}</span></div>
       <div class="thermal-row"><span>Rate</span><span>${formatCurrencyINR(rRate)}</span></div>
       <div class="thermal-divider"></div>
     `).join("");
@@ -345,7 +344,7 @@ export function EditRentalDialog({
 *Invoice:* ${rental.billNo || rental.id}
 *Client:* ${customer?.name || rental.customerId}
 *Pieces:* 
-${piecesData.map(p => `- ${p.rItem?.name || "Unknown"} (${p.r.itemNo || p.r.itemId}) [${formatDate(p.rStartDate.slice(0, 10))} to ${formatDate(p.rEndDate.slice(0, 10))}] - ${formatCurrencyINR(p.rRate)}`).join("\n")}
+${piecesData.map(p => `- ${p.rItem?.name || "Unknown"} (${p.r.itemNo || p.r.itemId}) [Del: ${formatDate(p.rDeliveryDate.slice(0, 10))} | Return: ${formatDate(p.rEndDate.slice(0, 10))}] - ${formatCurrencyINR(p.rRate)}`).join("\n")}
 
 *Subtotal:* ${formatCurrencyINR(aggSubtotal)}
 *Discount:* ${formatCurrencyINR(aggDiscount)}
@@ -372,7 +371,7 @@ Thank you for choosing ARIHANT COLLECTION!`;
     const piecesHtml = piecesData.map(({ r, rItem, rStartDate, rEndDate, rDeliveryDate, rRate, rSubtotal }) => `
       <tr>
         <td>${rItem?.image ? `<img src="${rItem.image}" style="width: 35px; height: 45px; object-fit: cover; border-radius: 3px;" />` : ""}</td>
-        <td><strong>${rItem?.name || "Unknown item"}</strong><br/><span style="font-size: 9px; color: #666;">${rItem?.designer || ""}</span><br/><span style="font-size: 9px; color: #666;">Del: ${formatDate(rDeliveryDate.slice(0, 10))} | ${formatDate(rStartDate.slice(0, 10))} to ${formatDate(rEndDate.slice(0, 10))}</span></td>
+        <td><strong>${rItem?.name || "Unknown item"}</strong><br/><span style="font-size: 9px; color: #666;">Del: ${formatDate(rDeliveryDate.slice(0, 10))} | Return: ${formatDate(rEndDate.slice(0, 10))}</span></td>
         <td>${r.itemNo || r.itemId}</td>
         <td class="text-right">${formatCurrencyINR(rRate)}</td>
         <td class="text-right">${formatCurrencyINR(rSubtotal)}</td>

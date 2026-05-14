@@ -12,20 +12,23 @@ export const Route = createFileRoute("/admin-login")({
 
 function AdminLoginPage() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("admin@arihent");
-  const [password, setPassword] = useState("arihent@123");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     
+    const trimmedUser = username.trim();
+    const trimmedPass = password.trim();
+
     // Mock Admin Authentication Logic
-    if (username === "admin@arihent" && password === "arihent@123") {
+    if ((trimmedUser === "admin@arihent" || trimmedUser === "admin") && trimmedPass === "arihent@123") {
       localStorage.setItem("user_role", "admin");
       localStorage.setItem("user_name", "Admin");
       toast.success("Logged in as Admin");
       navigate({ to: "/" });
     } else {
-      toast.error("Invalid admin credentials. (Hint: admin@arihent / arihent@123)");
+      toast.error("Invalid admin credentials. (Hint: admin / arihent@123)");
     }
   };
 
@@ -38,15 +41,16 @@ function AdminLoginPage() {
           <p className="text-sm text-muted-foreground mt-1">Sign in to manage the atelier</p>
         </div>
         
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
           <div className="space-y-2">
             <Label htmlFor="username">Admin Username</Label>
             <Input 
               id="username" 
               type="text" 
-              placeholder="admin@arihent" 
+              placeholder="Enter admin username" 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              autoComplete="off"
               required 
             />
           </div>
@@ -57,6 +61,7 @@ function AdminLoginPage() {
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
               required 
             />
           </div>
