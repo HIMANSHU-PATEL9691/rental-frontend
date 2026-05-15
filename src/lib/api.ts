@@ -1,4 +1,6 @@
 const API_ROOT = import.meta.env.VITE_API_URL || "https://api.arihantcollection.tech";
+
+
 const API_BASE = `${API_ROOT.replace(/\/$/, '')}/api`;
 
 console.info('[api] API root:', API_ROOT);
